@@ -28,6 +28,19 @@ jobs:
           Write-Host "llvm-mingw at $bin"
           Add-Content $env:GITHUB_PATH $bin
 
+      # gitee.com often times out from GitHub's runners: fetch the three public JieLi SDK files with retries.
+      # get_sdk_files.py skips files that exist and still checks each one's SHA-256.
+      - name: Prefetch JieLi SDK boot files (retries)
+        shell: bash
+        run: |
+          base="https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK/raw/5fa84a9b2f723a5e9337ad79dc2ad741fc98fe2d/cpu/wl82/tools"
+          dest="custom-fw/third_party/jieli_sdk_files"
+          for f in uboot.boot cfg_tool.bin cfg/eq_cfg_hw.bin; do
+            mkdir -p "$dest/$(dirname "$f")"
+            curl -fsSL --retry 10 --retry-all-errors --retry-delay 15 --connect-timeout 30 --max-time 180 -o "$dest/$f" "$base/$f"
+            ls -l "$dest/$f"
+          done
+
       - name: Build with Build-Onyx-BLE.ps1 (non-interactive)
         shell: powershell
         env:
