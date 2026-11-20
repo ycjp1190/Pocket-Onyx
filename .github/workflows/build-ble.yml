@@ -1,0 +1,36 @@
+name: Build Onyx BLE (private package)
+
+# Runs only when started by hand. The BLE build is for the owner's own unit, so the result
+# is uploaded inside a password-protected 7z (password in the repository secret ONYX_PKG_PW).
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build with Build-Onyx-BLE.ps1 (non-interactive)
+        shell: powershell
+        env:
+          ONYX_AUTO_INSTALL: "1"
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File Build-Onyx-BLE.ps1 -Yes
+
+      - name: Pack the result with a password
+        shell: powershell
+        env:
+          PW: ${{ secrets.ONYX_PKG_PW }}
+        run: |
+          if (-not $env:PW) { throw "secret ONYX_PKG_PW is missing" }
+          if (-not (Test-Path Onyx-BLE-build)) { throw "no Onyx-BLE-build folder" }
+          Get-ChildItem -Recurse Onyx-BLE-build | Format-Table Name, Length
+          & 7z a -t7z -mhe=on "-p$env:PW" onyx-ble.7z Onyx-BLE-build | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "7z failed" }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: onyx-ble-private
+          path: onyx-ble.7z
+          retention-days: 3
